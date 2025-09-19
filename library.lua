@@ -1,3 +1,18 @@
+local LIBRARY_DEBUG = true
+
+local function libraryDebug(level, message, data)
+    if not LIBRARY_DEBUG then return end
+    local timestamp = os.date("%H:%M:%S")
+    local levelStr = ({INFO = "[LIB INFO]", WARN = "[LIB WARN]", ERROR = "[LIB ERROR]"})[level] or "[LIB DEBUG]"
+    local logMsg = string.format("[%s] %s: %s", timestamp, levelStr, message)
+    
+    if data then
+        logMsg = logMsg .. " | Data: " .. tostring(data)
+    end
+    
+    print(logMsg)
+end
+
 local library = {flags = {}, windows = {}, open = true}
 
 --Services
@@ -1607,36 +1622,67 @@ end
 local UIToggle
 local UnlockMouse
 function library:Init()
-	
-	self.base = self.base or self:Create("ScreenGui")
-if syn and syn.protect_gui then
-    syn.protect_gui(self.base)
-elseif protect_gui then
-    protect_gui(self.base)
-elseif get_hidden_gui or gethui then
-    local hiddenUI = get_hidden_gui or gethui
-    self.base.Parent = hiddenUI()
-else
-    game:GetService"Players".LocalPlayer:Kick("Error: protect_gui function not found")
-    return
-end
-self.base.Parent = game:GetService"CoreGui"
-	
-	self.cursor = self.cursor or self:Create("Frame", {
-		ZIndex = 100,
-		AnchorPoint = Vector2.new(0, 0),
-		Size = UDim2.new(0, 5, 0, 5),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		Parent = self.base
-	})
-	
-	for _, window in next, self.windows do
-		if window.canInit and not window.init then
-			window.init = true
-			createOptionHolder(window.title, self.base, window)
-			loadOptions(window)
-		end
-	end
+    libraryDebug(1, "Library Init", "Starting initialization...")
+    
+    self.base = self.base or self:Create("ScreenGui")
+    
+    -- Enhanced GUI protection with debug
+    local guiSuccess = false
+    if syn and syn.protect_gui then
+        pcall(function() syn.protect_gui(self.base) end)
+        guiSuccess = true
+        libraryDebug(1, "GUI Protection", "Using syn.protect_gui")
+    elseif protect_gui then
+        pcall(function() protect_gui(self.base) end)
+        guiSuccess = true
+        libraryDebug(1, "GUI Protection", "Using protect_gui")
+    elseif get_hidden_gui then
+        local hiddenGui = get_hidden_gui()
+        if hiddenGui then
+            self.base.Parent = hiddenGui
+            guiSuccess = true
+            libraryDebug(1, "GUI Protection", "Using get_hidden_gui")
+        end
+    elseif gethui then
+        local hiddenGui = gethui()
+        if hiddenGui then
+            self.base.Parent = hiddenGui
+            guiSuccess = true
+            libraryDebug(1, "GUI Protection", "Using gethui")
+        end
+    end
+    
+    if not guiSuccess then
+        libraryDebug(3, "GUI Protection", "No protection method available, using CoreGui")
+        self.base.Parent = game:GetService"CoreGui"
+    end
+    
+    libraryDebug(1, "Base GUI", {parent = self.base.Parent.Name})
+    
+    -- Cursor setup
+    self.cursor = self.cursor or self:Create("Frame", {
+        ZIndex = 100,
+        AnchorPoint = Vector2.new(0, 0),
+        Size = UDim2.new(0, 5, 0, 5),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        Parent = self.base
+    })
+    
+    libraryDebug(1, "Cursor Created", "UI cursor initialized")
+    
+    -- Window initialization
+    local windowCount = 0
+    for _, window in next, self.windows do
+        if window.canInit and not window.init then
+            window.init = true
+            createOptionHolder(window.title, self.base, window)
+            loadOptions(window)
+            windowCount = windowCount + 1
+            libraryDebug(1, "Window Initialized", {title = window.title})
+        end
+    end
+    
+    libraryDebug(1, "Init Complete", {windows = windowCount})
 end
 
 function library:Close()
